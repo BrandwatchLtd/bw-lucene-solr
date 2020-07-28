@@ -1,0 +1,296 @@
+package org.apache.solr.search.facet;
+
+import org.apache.lucene.util.LuceneTestCase;
+import org.junit.Test;
+
+public class BitmapFrequencyCounterTest extends LuceneTestCase {
+  private static final int TEST_ORDINAL = 5;
+
+  @Test(expected = NegativeArraySizeException.class)
+  public void givenNegativeSize_whenConstructingCounter() {
+    new BitmapFrequencyCounter(-1);
+  }
+
+  @Test
+  public void givenSize0_whenAddingValue_withFrequency1() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(0);
+
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 0);
+    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+  }
+
+  @Test
+  public void givenSize0_whenAddingValue_withFrequency2() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(0);
+
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 0);
+    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+  }
+
+  @Test
+  public void givenSize1_whenAddingValue_withFrequency1() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(1);
+
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 1);
+    assertTrue(counter.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertNull(counter.getOverflow());
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 2);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 1);
+  }
+
+  @Test
+  public void givenSize1_whenAddingValue_withFrequency2() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(1);
+
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 1);
+    assertFalse(counter.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 2);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 0);
+  }
+
+  @Test
+  public void givenSize2_whenAddingValue_withFrequency1() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(2);
+
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 2);
+    assertTrue(counter.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertNull(counter.getOverflow());
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 2);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 1);
+  }
+
+  @Test
+  public void givenSize2_whenAddingValue_withFrequency2() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(2);
+
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 2);
+    assertFalse(counter.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(counter.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertNull(counter.getOverflow());
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 4);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 0);
+    assertEquals(decoded[2], 1);
+    assertEquals(decoded[3], 0);
+  }
+
+  @Test
+  public void givenSize2_whenAddingValue_withFrequency3() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(2);
+
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 2);
+    assertTrue(counter.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(counter.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertNull(counter.getOverflow());
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 4);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 0);
+    assertEquals(decoded[2], 0);
+    assertEquals(decoded[3], 1);
+  }
+
+  @Test
+  public void givenSize2_whenAddingValue_withFrequency4() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(2);
+
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+    counter.add(TEST_ORDINAL);
+
+    assertEquals(counter.getBitmaps().length, 2);
+    assertFalse(counter.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertFalse(counter.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 4);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 0);
+    assertEquals(decoded[2], 0);
+    assertEquals(decoded[3], 0);
+  }
+
+  @Test
+  public void givenSize2_whenAddingMultipleValues() {
+    BitmapFrequencyCounter counter = new BitmapFrequencyCounter(2);
+
+    counter.add(101);
+
+    counter.add(102);
+    counter.add(102);
+    counter.add(202);
+    counter.add(202);
+
+    counter.add(103);
+    counter.add(103);
+    counter.add(103);
+    counter.add(203);
+    counter.add(203);
+    counter.add(203);
+    counter.add(303);
+    counter.add(303);
+    counter.add(303);
+
+    assertEquals(counter.getBitmaps().length, 2);
+
+    assertTrue(counter.getBitmaps()[0].contains(101));
+    assertFalse(counter.getBitmaps()[1].contains(101));
+
+    assertFalse(counter.getBitmaps()[0].contains(102));
+    assertTrue(counter.getBitmaps()[1].contains(102));
+    assertFalse(counter.getBitmaps()[0].contains(202));
+    assertTrue(counter.getBitmaps()[1].contains(202));
+
+    assertTrue(counter.getBitmaps()[0].contains(103));
+    assertTrue(counter.getBitmaps()[1].contains(103));
+    assertTrue(counter.getBitmaps()[0].contains(203));
+    assertTrue(counter.getBitmaps()[1].contains(203));
+    assertTrue(counter.getBitmaps()[0].contains(303));
+    assertTrue(counter.getBitmaps()[1].contains(303));
+
+    assertNull(counter.getOverflow());
+
+    int[] decoded = counter.decode();
+
+    assertEquals(decoded.length, 4);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 1);
+    assertEquals(decoded[2], 2);
+    assertEquals(decoded[3], 3);
+  }
+
+  @Test
+  public void givenSize2_whenMergingValues() {
+    BitmapFrequencyCounter x = new BitmapFrequencyCounter(2);
+    BitmapFrequencyCounter y = new BitmapFrequencyCounter(2);
+
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+
+    assertEquals(x.getBitmaps().length, 2);
+    assertFalse(x.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(x.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertNull(x.getOverflow());
+    
+    y.add(TEST_ORDINAL);
+    y.add(TEST_ORDINAL);
+
+    assertEquals(y.getBitmaps().length, 2);
+    assertFalse(y.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(y.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertNull(y.getOverflow());
+
+    x = x.merge(y);
+
+    assertEquals(x.getBitmaps().length, 2);
+    assertFalse(x.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertFalse(x.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertTrue(x.getOverflow().contains(TEST_ORDINAL));
+  }
+
+  @Test
+  public void givenSize4_whenMergingValues() {
+    BitmapFrequencyCounter x = new BitmapFrequencyCounter(4);
+    BitmapFrequencyCounter y = new BitmapFrequencyCounter(4);
+
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+    x.add(TEST_ORDINAL);
+
+    assertEquals(x.getBitmaps().length, 4);
+    assertFalse(x.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(x.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertFalse(x.getBitmaps()[2].contains(TEST_ORDINAL));
+    assertTrue(x.getBitmaps()[3].contains(TEST_ORDINAL));
+    assertNull(x.getOverflow());
+
+    y.add(TEST_ORDINAL);
+    y.add(TEST_ORDINAL);
+    y.add(TEST_ORDINAL);
+    y.add(TEST_ORDINAL);
+    y.add(TEST_ORDINAL);
+
+    assertEquals(y.getBitmaps().length, 4);
+    assertTrue(y.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertFalse(y.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertTrue(y.getBitmaps()[2].contains(TEST_ORDINAL));
+    assertNull(y.getBitmaps()[3]);
+    assertNull(y.getOverflow());
+
+    x = x.merge(y);
+
+    assertEquals(x.getBitmaps().length, 4);
+    assertTrue(x.getBitmaps()[0].contains(TEST_ORDINAL));
+    assertTrue(x.getBitmaps()[1].contains(TEST_ORDINAL));
+    assertTrue(x.getBitmaps()[2].contains(TEST_ORDINAL));
+    assertTrue(x.getBitmaps()[3].contains(TEST_ORDINAL));
+    assertNull(y.getOverflow());
+
+    int[] decoded = x.decode();
+
+    assertEquals(decoded.length, 16);
+    assertEquals(decoded[0], 0);
+    assertEquals(decoded[1], 0);
+    assertEquals(decoded[2], 0);
+    assertEquals(decoded[3], 0);
+    assertEquals(decoded[4], 0);
+    assertEquals(decoded[5], 0);
+    assertEquals(decoded[6], 0);
+    assertEquals(decoded[7], 0);
+    assertEquals(decoded[8], 0);
+    assertEquals(decoded[9], 0);
+    assertEquals(decoded[10], 0);
+    assertEquals(decoded[11], 0);
+    assertEquals(decoded[12], 0);
+    assertEquals(decoded[13], 0);
+    assertEquals(decoded[14], 0);
+    assertEquals(decoded[15], 1);
+  }
+}

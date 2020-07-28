@@ -57,14 +57,16 @@ import org.apache.solr.schema.TextField;
 import org.apache.solr.search.facet.AggValueSource;
 import org.apache.solr.search.facet.AvgAgg;
 import org.apache.solr.search.facet.BitmapCollectorAgg;
+import org.apache.solr.search.facet.BitmapFrequencyAgg;
 import org.apache.solr.search.facet.CountAgg;
+import org.apache.solr.search.facet.FrequencyOfFrequenciesAgg;
 import org.apache.solr.search.facet.HLLAgg;
 import org.apache.solr.search.facet.MinMaxAgg;
 import org.apache.solr.search.facet.PercentileAgg;
+import org.apache.solr.search.facet.RelatednessAgg;
 import org.apache.solr.search.facet.StddevAgg;
 import org.apache.solr.search.facet.SumAgg;
 import org.apache.solr.search.facet.SumsqAgg;
-import org.apache.solr.search.facet.RelatednessAgg;
 import org.apache.solr.search.facet.TopDocsAgg;
 import org.apache.solr.search.facet.UniqueAgg;
 import org.apache.solr.search.facet.UniqueBlockAgg;
@@ -1058,6 +1060,10 @@ public abstract class ValueSourceParser implements NamedListInitializedPlugin {
     addParser("agg_topdocs", new TopDocsAgg.Parser());
 
     addParser("agg_bitmapcollector", new BitmapCollectorAgg.Parser());
+
+    addParser("agg_bitmapfreq", new BitmapFrequencyAgg.Parser());
+
+    addParser("agg_bitmapfreqfreq", new FrequencyOfFrequenciesAgg.Parser());
 
     addParser("childfield", new ChildFieldValueSourceParser());
   }
