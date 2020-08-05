@@ -1,5 +1,8 @@
 package org.apache.solr.search.facet;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import org.apache.lucene.queries.function.ValueSource;
 import org.apache.solr.common.util.SimpleOrderedMap;
 import org.apache.solr.search.FunctionQParser;
@@ -9,10 +12,8 @@ import org.apache.solr.search.ValueSourceParser;
 /**
  * Calculates the frequency-of-frequencies (number of values occurring x times) of ordinal values.
  *
- * The response is a map with the following fields:
- * - frequencies: an array where {@code frequencies[i]} is the number of values with {@code frequency = i} (omitted
- *   if empty)
- * - overflow: the number of values with {@code frequency > frequencies.length}
+ * The response is a map where the keys are frequencies (x = number of times a value occurred), and the values are
+ * the frequency-of-frequencies (number of values which occurred x times).
  *
  * Lacking a coherent definition of magnitude other than the raw count, this aggregate cannot be used for sorting.
  */
@@ -75,10 +76,15 @@ public class FrequencyOfFrequenciesAgg extends SimpleAggValueSource {
 
     @Override
     public Object getMergedResult() {
-      SimpleOrderedMap<Object> map = new SimpleOrderedMap<>();
+      Map<Integer, Integer> map = new LinkedHashMap<>();
 
-      map.add("frequencies", result.decode());
-      map.add("overflow", result.getOverflow().getCardinality());
+      int[] lowFrequencies = result.decode();
+      for (int i = 0; i < lowFrequencies.length; i++) {
+        map.put(i, lowFrequencies[i]);
+      }
+
+      result.getOverflow()
+        .forEach((value, freq) -> map.merge(freq, 1, Integer::sum));
 
       return map;
     }

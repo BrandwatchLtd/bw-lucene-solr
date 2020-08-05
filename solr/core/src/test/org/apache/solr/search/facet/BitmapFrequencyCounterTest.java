@@ -18,7 +18,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     counter.add(TEST_ORDINAL);
 
     assertEquals(counter.getBitmaps().length, 0);
-    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+    assertEquals(counter.getOverflow().get(TEST_ORDINAL), Integer.valueOf(1));
   }
 
   @Test
@@ -29,7 +29,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     counter.add(TEST_ORDINAL);
 
     assertEquals(counter.getBitmaps().length, 0);
-    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+    assertEquals(counter.getOverflow().get(TEST_ORDINAL), Integer.valueOf(2));
   }
 
   @Test
@@ -40,7 +40,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
 
     assertEquals(counter.getBitmaps().length, 1);
     assertTrue(counter.getBitmaps()[0].contains(TEST_ORDINAL));
-    assertNull(counter.getOverflow());
+    assertTrue(counter.getOverflow().isEmpty());
 
     int[] decoded = counter.decode();
 
@@ -58,7 +58,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
 
     assertEquals(counter.getBitmaps().length, 1);
     assertFalse(counter.getBitmaps()[0].contains(TEST_ORDINAL));
-    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+    assertEquals(counter.getOverflow().get(TEST_ORDINAL), Integer.valueOf(2));
 
     int[] decoded = counter.decode();
 
@@ -75,7 +75,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
 
     assertEquals(counter.getBitmaps().length, 2);
     assertTrue(counter.getBitmaps()[0].contains(TEST_ORDINAL));
-    assertNull(counter.getOverflow());
+    assertTrue(counter.getOverflow().isEmpty());
 
     int[] decoded = counter.decode();
 
@@ -94,7 +94,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertEquals(counter.getBitmaps().length, 2);
     assertFalse(counter.getBitmaps()[0].contains(TEST_ORDINAL));
     assertTrue(counter.getBitmaps()[1].contains(TEST_ORDINAL));
-    assertNull(counter.getOverflow());
+    assertTrue(counter.getOverflow().isEmpty());
 
     int[] decoded = counter.decode();
 
@@ -116,7 +116,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertEquals(counter.getBitmaps().length, 2);
     assertTrue(counter.getBitmaps()[0].contains(TEST_ORDINAL));
     assertTrue(counter.getBitmaps()[1].contains(TEST_ORDINAL));
-    assertNull(counter.getOverflow());
+    assertTrue(counter.getOverflow().isEmpty());
 
     int[] decoded = counter.decode();
 
@@ -139,7 +139,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertEquals(counter.getBitmaps().length, 2);
     assertFalse(counter.getBitmaps()[0].contains(TEST_ORDINAL));
     assertFalse(counter.getBitmaps()[1].contains(TEST_ORDINAL));
-    assertTrue(counter.getOverflow().contains(TEST_ORDINAL));
+    assertEquals(counter.getOverflow().get(TEST_ORDINAL), Integer.valueOf(4));
 
     int[] decoded = counter.decode();
 
@@ -188,7 +188,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertTrue(counter.getBitmaps()[0].contains(303));
     assertTrue(counter.getBitmaps()[1].contains(303));
 
-    assertNull(counter.getOverflow());
+    assertTrue(counter.getOverflow().isEmpty());
 
     int[] decoded = counter.decode();
 
@@ -210,22 +210,22 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertEquals(x.getBitmaps().length, 2);
     assertFalse(x.getBitmaps()[0].contains(TEST_ORDINAL));
     assertTrue(x.getBitmaps()[1].contains(TEST_ORDINAL));
-    assertNull(x.getOverflow());
-    
+    assertTrue(x.getOverflow().isEmpty());
+
     y.add(TEST_ORDINAL);
     y.add(TEST_ORDINAL);
 
     assertEquals(y.getBitmaps().length, 2);
     assertFalse(y.getBitmaps()[0].contains(TEST_ORDINAL));
     assertTrue(y.getBitmaps()[1].contains(TEST_ORDINAL));
-    assertNull(y.getOverflow());
+    assertTrue(y.getOverflow().isEmpty());
 
     x = x.merge(y);
 
     assertEquals(x.getBitmaps().length, 2);
     assertFalse(x.getBitmaps()[0].contains(TEST_ORDINAL));
     assertFalse(x.getBitmaps()[1].contains(TEST_ORDINAL));
-    assertTrue(x.getOverflow().contains(TEST_ORDINAL));
+    assertEquals(x.getOverflow().get(TEST_ORDINAL), Integer.valueOf(4));
   }
 
   @Test
@@ -249,7 +249,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertTrue(x.getBitmaps()[1].contains(TEST_ORDINAL));
     assertFalse(x.getBitmaps()[2].contains(TEST_ORDINAL));
     assertTrue(x.getBitmaps()[3].contains(TEST_ORDINAL));
-    assertNull(x.getOverflow());
+    assertTrue(x.getOverflow().isEmpty());
 
     y.add(TEST_ORDINAL);
     y.add(TEST_ORDINAL);
@@ -262,7 +262,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertFalse(y.getBitmaps()[1].contains(TEST_ORDINAL));
     assertTrue(y.getBitmaps()[2].contains(TEST_ORDINAL));
     assertNull(y.getBitmaps()[3]);
-    assertNull(y.getOverflow());
+    assertTrue(y.getOverflow().isEmpty());
 
     x = x.merge(y);
 
@@ -271,7 +271,7 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertTrue(x.getBitmaps()[1].contains(TEST_ORDINAL));
     assertTrue(x.getBitmaps()[2].contains(TEST_ORDINAL));
     assertTrue(x.getBitmaps()[3].contains(TEST_ORDINAL));
-    assertNull(y.getOverflow());
+    assertTrue(x.getOverflow().isEmpty());
 
     int[] decoded = x.decode();
 

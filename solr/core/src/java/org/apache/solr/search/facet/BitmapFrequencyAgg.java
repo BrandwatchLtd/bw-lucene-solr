@@ -12,7 +12,7 @@ import org.apache.solr.search.ValueSourceParser;
  * The response is a map with the following fields:
  * - bitmaps: an array of bitmaps, where the frequency of a value x is given by the sum of {@code 2^i} for all values
  *   of {@code i} where {@code bitmaps[i].contains(x)}
- * - overflow: a bitmap of ordinal values with {@code frequency >= 2^(bitmaps.length)}
+ * - overflow: a map of ordinal values to frequencies, for values with {@code frequency >= 2^(bitmaps.length)}
  *
  * Lacking a coherent definition of magnitude other than the raw count, this aggregate cannot be used for sorting.
  */

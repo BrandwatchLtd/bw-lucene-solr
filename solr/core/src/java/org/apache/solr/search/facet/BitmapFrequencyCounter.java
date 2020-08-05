@@ -1,6 +1,10 @@
 package org.apache.solr.search.facet;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.solr.common.util.SimpleOrderedMap;
+import org.roaringbitmap.RoaringBatchIterator;
 import org.roaringbitmap.RoaringBitmap;
 
 /**
@@ -8,15 +12,18 @@ import org.roaringbitmap.RoaringBitmap;
  */
 public class BitmapFrequencyCounter {
   private final RoaringBitmap[] bitmaps;
-  private RoaringBitmap overflow;
+  private final Map<Integer, Integer> overflow;
 
   /**
-   * Constructs a new frequency counter. The maximum countable frequency will be given by {@code (2^size)-1}.
+   * Constructs a new frequency counter. Frequencies greater than {@code (2^size)-1} will be represented as a HashMap
+   * (rather than a compact bitmap encoding), and for efficiency should not represent a large fraction of the distinct
+   * values to be counted.
    *
    * @param size The maximum size of the frequencies list
    */
   public BitmapFrequencyCounter(int size) {
     this.bitmaps = new RoaringBitmap[size];
+    this.overflow = new HashMap<>();
   }
 
   /**
@@ -30,11 +37,11 @@ public class BitmapFrequencyCounter {
   }
 
   /**
-   * The overflow set of all values with {@code frequency >= 2^(bitmaps.length)}.
+   * A map of high-frequency values (with {@code frequency >= 2^(bitmaps.length)}).
    *
-   * @return The overflow set
+   * @return The map of high-frequency values.
    */
-  public RoaringBitmap getOverflow() {
+  public Map<Integer, Integer> getOverflow() {
     return this.overflow;
   }
 
@@ -44,6 +51,11 @@ public class BitmapFrequencyCounter {
    * @param value The value to add
    */
   public void add(int value) {
+    final Integer overflowCount = overflow.computeIfPresent(value, (v, f) -> f + 1);
+    if (overflowCount != null) {
+      return;
+    }
+
     // This is just binary addition x+1=y - we carry the value till we find an empty column
     for (int i = 0; i < bitmaps.length; i++) {
       RoaringBitmap bitmap = bitmaps[i];
@@ -61,11 +73,7 @@ public class BitmapFrequencyCounter {
 
     // If we reach this point, the frequency of this value is >= 2^(bitmaps.length)
 
-    if (overflow == null) {
-      overflow = new RoaringBitmap();
-    }
-
-    overflow.add(value);
+    overflow.put(value, 1 << bitmaps.length);
   }
 
   /**
@@ -95,9 +103,8 @@ public class BitmapFrequencyCounter {
       serialized.add("bitmaps", serializedBitmaps);
     }
 
-    if (overflow != null) {
-      overflow.runOptimize();
-      serialized.add("overflow", BitmapUtil.bitmapToBytes(overflow));
+    if (!overflow.isEmpty()) {
+      serialized.add("overflow", overflow);
     }
 
     return serialized;
@@ -119,11 +126,9 @@ public class BitmapFrequencyCounter {
       }
     }
 
-    byte[] overflow = (byte[]) serialized.get("overflow");
+    Map<Integer, Integer> overflow = (Map<Integer, Integer>) serialized.get("overflow");
     if (overflow != null) {
-      this.overflow = BitmapUtil.bytesToBitmap(overflow);
-    } else {
-      this.overflow = null;
+      this.overflow.putAll(overflow);
     }
   }
 
@@ -214,10 +219,26 @@ public class BitmapFrequencyCounter {
     }
 
     if (i == bitmaps.length) {
-      if (overflow == null) {
-        overflow = c;
-      } else {
-        overflow.or(c);
+      other.overflow.forEach((value, freq) -> {
+        overflow.merge(value, freq, Integer::sum);
+      });
+
+      RoaringBatchIterator iter = c.getBatchIterator();
+      int[] batch = new int[128];
+      while (iter.hasNext()) {
+        int batchSize = iter.nextBatch(batch);
+        for (int j = 0; j < batchSize; j++) {
+          int value = batch[j];
+          int freq = 1 << bitmaps.length;
+
+          for (int k = 0; k < bitmaps.length; k++) {
+            if (bitmaps[j].contains(value)) {
+              freq += 1 << k;
+            }
+          }
+
+          overflow.merge(value, freq, Integer::sum);
+        }
       }
     }
 
