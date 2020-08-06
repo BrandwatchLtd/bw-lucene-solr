@@ -1,6 +1,13 @@
 package org.apache.solr.search.facet;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.apache.lucene.util.LuceneTestCase;
+import org.apache.solr.common.util.JavaBinCodec;
+import org.apache.solr.common.util.SimpleOrderedMap;
 import org.junit.Test;
 
 public class BitmapFrequencyCounterTest extends LuceneTestCase {
@@ -292,5 +299,55 @@ public class BitmapFrequencyCounterTest extends LuceneTestCase {
     assertEquals(decoded[13], 0);
     assertEquals(decoded[14], 0);
     assertEquals(decoded[15], 1);
+  }
+
+  @Test
+  public void testSerialization() throws IOException {
+    BitmapFrequencyCounter x = new BitmapFrequencyCounter(2);
+
+    x.add(101);
+
+    x.add(102);
+    x.add(102);
+    x.add(202);
+    x.add(202);
+
+    x.add(103);
+    x.add(103);
+    x.add(103);
+    x.add(203);
+    x.add(203);
+    x.add(203);
+    x.add(303);
+    x.add(303);
+    x.add(303);
+
+    JavaBinCodec codec = new JavaBinCodec();
+
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    codec.marshal(x.serialize(), out);
+
+    InputStream in = new ByteArrayInputStream(out.toByteArray());
+    BitmapFrequencyCounter y = new BitmapFrequencyCounter(2);
+    y.deserialize((SimpleOrderedMap<Object>) codec.unmarshal(in));
+
+    assertEquals(y.getBitmaps().length, 2);
+
+    assertTrue(y.getBitmaps()[0].contains(101));
+    assertFalse(y.getBitmaps()[1].contains(101));
+
+    assertFalse(y.getBitmaps()[0].contains(102));
+    assertTrue(y.getBitmaps()[1].contains(102));
+    assertFalse(y.getBitmaps()[0].contains(202));
+    assertTrue(y.getBitmaps()[1].contains(202));
+
+    assertTrue(y.getBitmaps()[0].contains(103));
+    assertTrue(y.getBitmaps()[1].contains(103));
+    assertTrue(y.getBitmaps()[0].contains(203));
+    assertTrue(y.getBitmaps()[1].contains(203));
+    assertTrue(y.getBitmaps()[0].contains(303));
+    assertTrue(y.getBitmaps()[1].contains(303));
+
+    assertTrue(y.getOverflow().isEmpty());
   }
 }

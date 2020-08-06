@@ -1,6 +1,8 @@
 package org.apache.solr.search.facet;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.solr.common.util.SimpleOrderedMap;
@@ -84,7 +86,7 @@ public class BitmapFrequencyCounter {
   public SimpleOrderedMap<Object> serialize() {
     SimpleOrderedMap<Object> serialized = new SimpleOrderedMap<>();
 
-    byte[][] serializedBitmaps = new byte[bitmaps.length][];
+    List<byte[]> serializedBitmaps = new ArrayList<>(bitmaps.length);
 
     int i = 0;
     while (i < bitmaps.length) {
@@ -94,7 +96,7 @@ public class BitmapFrequencyCounter {
       }
 
       bitmap.runOptimize();
-      serializedBitmaps[i] = BitmapUtil.bitmapToBytes(bitmap);
+      serializedBitmaps.add(BitmapUtil.bitmapToBytes(bitmap));
 
       i++;
     }
@@ -119,10 +121,10 @@ public class BitmapFrequencyCounter {
    * @param serialized The serialized data
    */
   public void deserialize(SimpleOrderedMap<Object> serialized) {
-    byte[][] serializedBitmaps = (byte[][]) serialized.get("bitmaps");
+    List<byte[]> serializedBitmaps = (List<byte[]>) serialized.get("bitmaps");
     if (serializedBitmaps != null) {
-      for (int i = 0; i < bitmaps.length; i++) {
-        bitmaps[i] = BitmapUtil.bytesToBitmap(serializedBitmaps[i]);
+      for (int i = 0; i < serializedBitmaps.size(); i++) {
+        bitmaps[i] = BitmapUtil.bytesToBitmap(serializedBitmaps.get(i));
       }
     }
 
