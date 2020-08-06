@@ -65,12 +65,10 @@ public class BitmapFrequencyCounter {
         bitmap = bitmaps[i] = new RoaringBitmap();
       }
 
-      if (!bitmap.contains(value)) {
+      if (!bitmap.checkedRemove(value)) {
         bitmap.add(value);
         return;
       }
-
-      bitmap.remove(value);
     }
 
     // If we reach this point, the frequency of this value is >= 2^(bitmaps.length)
@@ -234,7 +232,7 @@ public class BitmapFrequencyCounter {
           int freq = 1 << bitmaps.length;
 
           for (int k = 0; k < bitmaps.length; k++) {
-            if (bitmaps[j].contains(value)) {
+            if (bitmaps[k].checkedRemove(value)) {
               freq += 1 << k;
             }
           }
