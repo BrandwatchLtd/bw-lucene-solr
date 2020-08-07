@@ -80,7 +80,10 @@ public class FrequencyOfFrequenciesAgg extends SimpleAggValueSource {
 
       int[] lowFrequencies = result.decode();
       for (int i = 0; i < lowFrequencies.length; i++) {
-        map.put(i, lowFrequencies[i]);
+        int value = lowFrequencies[i];
+        if (value > 0) {
+          map.put(i, value);
+        }
       }
 
       result.getOverflow()
