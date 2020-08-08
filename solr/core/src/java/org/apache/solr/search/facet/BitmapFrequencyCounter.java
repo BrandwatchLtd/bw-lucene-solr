@@ -230,19 +230,23 @@ public class BitmapFrequencyCounter {
         for (int j = 0; j < batchSize; j++) {
           int value = batch[j];
           int freq = 1 << bitmaps.length;
-
-          for (int k = 0; k < bitmaps.length; k++) {
-            if (bitmaps[k].checkedRemove(value)) {
-              freq += 1 << k;
-            }
-          }
-
           overflow.merge(value, freq, Integer::sum);
         }
       }
     }
 
     return this;
+  }
+
+  public void normalize() {
+    overflow.replaceAll((value, freq) -> {
+      for (int k = 0; k < bitmaps.length; k++) {
+        if (bitmaps[k].checkedRemove(value)) {
+          freq += 1 << k;
+        }
+      }
+      return freq;
+    });
   }
 
   public int[] decode() {

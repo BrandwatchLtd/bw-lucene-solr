@@ -78,6 +78,8 @@ public class FrequencyOfFrequenciesAgg extends SimpleAggValueSource {
     public Object getMergedResult() {
       Map<Integer, Integer> map = new LinkedHashMap<>();
 
+      result.normalize();
+
       int[] lowFrequencies = result.decode();
       for (int i = 0; i < lowFrequencies.length; i++) {
         int value = lowFrequencies[i];

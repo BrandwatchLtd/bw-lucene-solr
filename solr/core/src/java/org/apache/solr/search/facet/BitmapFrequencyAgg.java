@@ -75,6 +75,7 @@ public class BitmapFrequencyAgg extends SimpleAggValueSource {
 
     @Override
     public Object getMergedResult() {
+      result.normalize();
       return result.serialize();
     }
   }
