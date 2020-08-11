@@ -67,6 +67,7 @@ import org.apache.solr.search.facet.RelatednessAgg;
 import org.apache.solr.search.facet.StddevAgg;
 import org.apache.solr.search.facet.SumAgg;
 import org.apache.solr.search.facet.SumsqAgg;
+import org.apache.solr.search.facet.TermFrequencyOfFrequenciesAgg;
 import org.apache.solr.search.facet.TopDocsAgg;
 import org.apache.solr.search.facet.UniqueAgg;
 import org.apache.solr.search.facet.UniqueBlockAgg;
@@ -1064,6 +1065,8 @@ public abstract class ValueSourceParser implements NamedListInitializedPlugin {
     addParser("agg_bitmapfreq", new BitmapFrequencyAgg.Parser());
 
     addParser("agg_bitmapfreqfreq", new FrequencyOfFrequenciesAgg.Parser());
+
+    addParser("agg_termfreqfreq", new TermFrequencyOfFrequenciesAgg.Parser());
 
     addParser("childfield", new ChildFieldValueSourceParser());
   }
