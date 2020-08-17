@@ -1064,7 +1064,11 @@ public abstract class ValueSourceParser implements NamedListInitializedPlugin {
 
     addParser("agg_bitmapfreq", new BitmapFrequencyAgg.Parser());
 
+    addParser("agg_bitmapfreq64", new BitmapFrequencyAgg.Parser());
+
     addParser("agg_bitmapfreqfreq", new FrequencyOfFrequenciesAgg.Parser());
+
+    addParser("agg_bitmapfreqfreq64", new FrequencyOfFrequenciesAgg.Parser());
 
     addParser("agg_termfreqfreq", new TermFrequencyOfFrequenciesAgg.Parser());
 
