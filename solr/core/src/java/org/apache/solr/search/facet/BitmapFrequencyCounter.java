@@ -71,7 +71,7 @@ public class BitmapFrequencyCounter {
       }
     }
 
-    // If we reach this point, the frequency of this value is >= 2^(bitmaps.length)
+    // If we reach this point, the frequency of this value has reached 2^(bitmaps.length)
 
     overflow.put(value, 1 << bitmaps.length);
   }
@@ -156,6 +156,12 @@ public class BitmapFrequencyCounter {
     //
     // which allows in-place modification of bitmaps (x modified into s, y modified into c).
 
+    if (bitmaps.length == 0) {
+      other.overflow.forEach((value, freq) -> overflow.merge(value, freq, Integer::sum));
+
+      return this;
+    }
+
     RoaringBitmap c;
 
     int i = 0;
@@ -219,9 +225,7 @@ public class BitmapFrequencyCounter {
     }
 
     if (i == bitmaps.length) {
-      other.overflow.forEach((value, freq) -> {
-        overflow.merge(value, freq, Integer::sum);
-      });
+      other.overflow.forEach((value, freq) -> overflow.merge(value, freq, Integer::sum));
 
       RoaringBatchIterator iter = c.getBatchIterator();
       int[] batch = new int[128];
