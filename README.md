@@ -45,7 +45,7 @@ If you see an error about Ivy missing while invoking Ant (e.g., `.ant/lib does
 not exist`), run `ant ivy-bootstrap` and retry.
 
 Sometimes you may face issues with Ivy (e.g., an incompletely downloaded artifact).
-Cleaning up the Ivy cache and retrying is a workaround for most of such issues: 
+Cleaning up the Ivy cache and retrying is a workaround for most of such issues:
 
 `rm -rf ~/.ivy2/cache`
 
