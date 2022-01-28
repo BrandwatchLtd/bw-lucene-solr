@@ -135,12 +135,9 @@ public class SolrCloudScraper extends SolrScraper {
     return request(solrClient, metricsQuery);
   }
 
-  private Set<String> getBaseUrls() throws IOException {
-    return solrClient.getClusterStateProvider().getClusterState().getCollectionsMap().values()
-        .stream()
-        .map(DocCollection::getReplicas)
-        .flatMap(List::stream)
-        .map(Replica::getBaseUrl)
+  private Set<String> getBaseUrls() {
+    return solrClient.getClusterStateProvider().getLiveNodes().stream()
+        .map(s -> "http://" + s.replace("_", "/"))
         .collect(Collectors.toSet());
   }
 
