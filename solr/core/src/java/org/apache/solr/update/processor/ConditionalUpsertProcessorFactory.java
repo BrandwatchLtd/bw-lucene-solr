@@ -115,6 +115,7 @@ public class ConditionalUpsertProcessorFactory extends UpdateRequestProcessorFac
       if (phase == DistributedUpdateProcessor.DistribPhase.FROMLEADER) {
         return false;
       }
+      distribProc.setupRequest(cmd);
       return distribProc.isLeader();
     }
 
