@@ -31,6 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.solr.common.SolrException;
 import org.apache.solr.common.SolrInputDocument;
@@ -44,7 +45,9 @@ import static org.apache.solr.common.SolrException.ErrorCode.SERVER_ERROR;
 class UpsertCondition {
   private static final Logger log = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
 
-  private static final Pattern ACTION_PATTERN = Pattern.compile("^(skip|insert)|(upsert|retain):(\\*|[\\w,]+)|(nullify):([\\w,]+)$");
+  private static final Pattern ACTION_PATTERN = Pattern.compile(
+      "^(skip|insert)|(upsert|retain):(\\*|[\\w,]+)|(nullify):([\\w,]+)|(concat|concat_lc):([\\w]+):([\\w,|?]+)$"
+  );
   private static final List<String> ALL_FIELDS = Collections.singletonList("*");
 
   private final String name;
@@ -137,6 +140,7 @@ class UpsertCondition {
   boolean matches(SolrInputDocument oldDoc, SolrInputDocument newDoc) {
     Docs docs = new Docs(oldDoc, newDoc);
     boolean atLeastOneMatched = false;
+    boolean hasPositive = false;
     for (FieldRule rule: rules) {
       boolean ruleMatched = rule.matches(docs);
       switch(rule.getOccur()) {
@@ -145,25 +149,28 @@ class UpsertCondition {
             return false;
           }
           atLeastOneMatched = true;
+          hasPositive = true;
           break;
         case MUST_NOT:
           if (ruleMatched) {
             return false;
           }
-          atLeastOneMatched = true;
           break;
         default:
           atLeastOneMatched = ruleMatched || atLeastOneMatched;
+          hasPositive = true;
           break;
       }
     }
-    return atLeastOneMatched;
+    return atLeastOneMatched || !hasPositive;
   }
 
   enum ActionType {
     UPSERT, // copy some/all fields from the OLD doc (when they don't exist on the new doc)
     RETAIN, // copy some/all fields from the OLD doc always
     NULLIFY, // make sure specific fields are null before doc written
+    CONCAT, // attempt to set a field to be the concatenation of other fields from NEW or OLD doc
+    CONCAT_LC, // attempt to set a field to be the lowercase concatenation of other fields from NEW or OLD doc
     INSERT, // just do a regular insert as normal
     SKIP;   // entirely skip inserting the doc
   }
@@ -289,10 +296,12 @@ class UpsertCondition {
   private static class Action {
     private final ActionType type;
     private final List<String> fields;
+    private final String target;
 
-    Action(ActionType type, List<String> fields) {
+    Action(ActionType type, List<String> fields, String target) {
       this.type = type;
       this.fields = fields;
+      this.target = target;
     }
 
     static Action parse(String actionValue) {
@@ -302,6 +311,7 @@ class UpsertCondition {
       }
       ActionType type;
       List<String> fields;
+      String target = null;
       if (m.group(1) != null) {
         if ("skip".equals(m.group(1))) {
           type = ActionType.SKIP;
@@ -317,12 +327,21 @@ class UpsertCondition {
         }
         String fieldsConfig = m.group(3);
         fields = Arrays.asList(fieldsConfig.split(","));
-      } else {
+      } else if (m.group(4) != null) {
         type = ActionType.NULLIFY;
         String fieldsConfig = m.group(5);
         fields = Arrays.asList(fieldsConfig.split(","));
+      } else {
+        if ("concat".equals(m.group(6))) {
+          type = ActionType.CONCAT;
+        } else {
+          type = ActionType.CONCAT_LC;
+        }
+        target = m.group(7);
+        String fieldsConfig = m.group(8);
+        fields = Arrays.asList(fieldsConfig.split(","));
       }
-      return new Action(type, fields);
+      return new Action(type, fields, target);
     }
 
     void run(SolrInputDocument oldDoc, SolrInputDocument newDoc) {
@@ -346,7 +365,51 @@ class UpsertCondition {
         fields.forEach(field -> {
           newDoc.setField(field, null);
         });
+      } else if (type == ActionType.CONCAT || type == ActionType.CONCAT_LC) {
+        final StringBuilder builder = new StringBuilder();
+        for (String field : fields) {
+          final String fieldValue = getFieldValue(field, oldDoc, newDoc);
+          if (fieldValue == null) {
+            // One of the required fields is not present, so we can't set the target field
+            return;
+          }
+          builder.append(type == ActionType.CONCAT_LC ? fieldValue.toLowerCase(Locale.ROOT) : fieldValue);
+        }
+        newDoc.setField(target, builder.toString());
       }
+    }
+
+    private static String getFieldValue(String field, SolrInputDocument oldDoc, SolrInputDocument newDoc) {
+      boolean optional = field.endsWith("?");
+      for (String fieldName : StringUtils.removeEnd(field, "?").split("\\|")) {
+        String value = getFieldFromDoc(fieldName, newDoc);
+        if (value != null) {
+          return value;
+        }
+        value = getFieldFromDoc(fieldName, oldDoc);
+        if (value != null) {
+          return value;
+        }
+      }
+      return optional ? "" : null;
+    }
+
+    private static String getFieldFromDoc(String fieldName, SolrInputDocument doc) {
+      if (doc == null) {
+        return null;
+      }
+      Object fieldValue = doc.getFieldValue(fieldName);
+      if (fieldValue instanceof String) {
+        return (String)fieldValue;
+      }
+      if (fieldValue instanceof Map) {
+        final Object setValue = ((Map)fieldValue).get("set");
+        if (setValue instanceof String) {
+          return (String)setValue;
+        }
+      }
+      // Cannot support non-String types or collection (multi-valued field) types
+      return null;
     }
   }
 }
