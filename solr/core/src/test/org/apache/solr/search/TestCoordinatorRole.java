@@ -40,6 +40,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.solr.client.solrj.SolrClient;
 import org.apache.solr.client.solrj.SolrQuery;
+import org.apache.solr.client.solrj.SolrRequest;
 import org.apache.solr.client.solrj.embedded.JettySolrRunner;
 import org.apache.solr.client.solrj.impl.CloudSolrClient;
 import org.apache.solr.client.solrj.impl.Http2SolrClient;
@@ -884,6 +885,125 @@ public class TestCoordinatorRole extends SolrCloudTestCase {
               .process(client, COLLECTION_NAME);
 
       assertEquals(DOC_PER_COLLECTION_COUNT, response.getResults().getNumFound());
+    } finally {
+      cluster.shutdown();
+    }
+  }
+
+  public void testReplaceNodeSkipsCoordinatorNodesWhenOtherDataNodesExist() throws Exception {
+    final int DATA_NODE_COUNT = 2;
+    MiniSolrCloudCluster cluster =
+        configureCluster(DATA_NODE_COUNT)
+            .addConfig("conf1", configset("cloud-minimal"))
+            .configure();
+
+    List<String> dataNodes =
+        cluster.getJettySolrRunners().stream()
+            .map(JettySolrRunner::getNodeName)
+            .collect(Collectors.toList());
+    try {
+
+      final String COLLECTION_NAME = "c1";
+      String dataNode = cluster.getJettySolrRunner(0).getNodeName();
+
+      CollectionAdminRequest.createCollection(COLLECTION_NAME, "conf1", 1, 1)
+          .setCreateNodeSet(dataNode)
+          .process(cluster.getSolrClient());
+      // ensure replica is placed on the expected node
+      cluster.waitForActiveCollection(COLLECTION_NAME, 1, 1);
+      assertEquals(1, getCollectionState(COLLECTION_NAME).getReplicas().size());
+
+      int DOC_PER_COLLECTION_COUNT = 1000;
+      UpdateRequest ur = new UpdateRequest();
+      for (int i = 0; i < DOC_PER_COLLECTION_COUNT; i++) {
+        SolrInputDocument doc = new SolrInputDocument();
+        doc.addField("id", COLLECTION_NAME + "-" + i);
+        ur.add(doc);
+      }
+      CloudSolrClient client = cluster.getSolrClient();
+      ur.commit(client, COLLECTION_NAME);
+
+      System.setProperty(NodeRoles.NODE_ROLES_PROP, "coordinator:on");
+      JettySolrRunner coordinatorJetty;
+      try {
+        coordinatorJetty = cluster.startJettySolrRunner();
+      } finally {
+        System.clearProperty(NodeRoles.NODE_ROLES_PROP);
+      }
+
+      QueryResponse response =
+          (QueryResponse) new QueryRequest(new SolrQuery("*:*"))
+              .setPreferredNodes(ImmutableList.of(coordinatorJetty.getNodeName()))
+              .process(client, COLLECTION_NAME);
+
+      // Ensuring the coordinator node works as expected and returns the correct number of documents
+      assertEquals(DOC_PER_COLLECTION_COUNT, response.getResults().getNumFound());
+
+      // replace the data node without a target, Solr should choose the other data node, never the coordinator
+      String coordinatorNode = coordinatorJetty.getNodeName();
+      String otherDataNode = dataNodes.get(1);
+      CollectionAdminRequest.AsyncCollectionAdminRequest replaceNode =
+          new CollectionAdminRequest.ReplaceNode(dataNode, null);
+      replaceNode.setWaitForFinalState(true);
+      replaceNode.process(client);
+
+      waitForState(
+          "Cannot find replica moved off the source node yet after replace node",
+          COLLECTION_NAME,
+          (liveNodes, collectionState) -> {
+            if (collectionState.getReplicas().size() == 1) {
+              Replica replica = collectionState.getReplicas().get(0);
+              return !dataNode.equals(replica.getNodeName())
+                  && replica.getState() == Replica.State.ACTIVE;
+            }
+            return false;
+          });
+
+      Replica replica = getCollectionState(COLLECTION_NAME).getReplicas().get(0);
+      assertNotEquals("Replica was placed on the coordinator node", coordinatorNode, replica.getNodeName());
+      assertEquals(otherDataNode, replica.getNodeName());
+
+      // the moved replica should still serve all the documents
+      response =
+          (QueryResponse) new QueryRequest(new SolrQuery("*:*"))
+              .setPreferredNodes(ImmutableList.of(coordinatorNode))
+              .process(client, COLLECTION_NAME);
+      assertEquals(DOC_PER_COLLECTION_COUNT, response.getResults().getNumFound());
+    }
+    finally {
+      cluster.shutdown();
+    }
+  }
+
+  public void testReplaceNodeWillFailIfNoOtherNodesAndCoordinatorExists() throws Exception {
+    final int DATA_NODE_COUNT = 1;
+    MiniSolrCloudCluster cluster =
+        configureCluster(DATA_NODE_COUNT)
+            .addConfig("conf1", configset("cloud-minimal"))
+            .configure();
+
+    try {
+      final String COLLECTION_NAME = "c1";
+      String dataNode = cluster.getJettySolrRunner(0).getNodeName();
+
+      CollectionAdminRequest.createCollection(COLLECTION_NAME, "conf1", 1, 1)
+          .setCreateNodeSet(dataNode)
+          .process(cluster.getSolrClient());
+      cluster.waitForActiveCollection(COLLECTION_NAME, 1, 1);
+      assertEquals(1, getCollectionState(COLLECTION_NAME).getReplicas().size());
+
+      System.setProperty(NodeRoles.NODE_ROLES_PROP, "coordinator:on");
+      try {
+        cluster.startJettySolrRunner();
+      } finally {
+        System.clearProperty(NodeRoles.NODE_ROLES_PROP);
+      }
+      expectThrows(SolrException.class,
+          () -> new CollectionAdminRequest.ReplaceNode(dataNode, null).process(cluster.getSolrClient()));
+
+      // nothing should have moved
+      Replica replica = getCollectionState(COLLECTION_NAME).getReplicas().get(0);
+      assertEquals(dataNode, replica.getNodeName());
     } finally {
       cluster.shutdown();
     }
