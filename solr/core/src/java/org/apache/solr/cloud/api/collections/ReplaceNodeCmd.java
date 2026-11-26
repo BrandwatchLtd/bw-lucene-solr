@@ -119,13 +119,18 @@ public class ReplaceNodeCmd implements OverseerCollectionMessageHandler.Cmd {
           int numNrtReplicas = replicaType == Replica.Type.NRT ? 1 : 0;
           int numTlogReplicas = replicaType == Replica.Type.TLOG ? 1 : 0;
           int numPullReplicas = replicaType == Replica.Type.PULL ? 1 : 0;
+          List<String> candidateNodes = new ArrayList<>(Assign.filterNonDataNodes(
+              ocmh.cloudManager.getDistribStateManager(),
+              ocmh.cloudManager.getClusterStateProvider().getLiveNodes().stream()
+                  .filter(node -> !node.equals(source))
+                  .collect(Collectors.toList())));
           Assign.AssignRequest assignRequest = new Assign.AssignRequestBuilder()
               .forCollection(sourceCollection)
               .forShard(Collections.singletonList(sourceReplica.getStr(SHARD_ID_PROP)))
               .assignNrtReplicas(numNrtReplicas)
               .assignTlogReplicas(numTlogReplicas)
               .assignPullReplicas(numPullReplicas)
-              .onNodes(new ArrayList<>(ocmh.cloudManager.getClusterStateProvider().getLiveNodes().stream().filter(node -> !node.equals(source)).collect(Collectors.toList())))
+              .onNodes(candidateNodes)
               .build();
           Assign.AssignStrategyFactory assignStrategyFactory = new Assign.AssignStrategyFactory(ocmh.cloudManager);
           Assign.AssignStrategy assignStrategy = assignStrategyFactory.create(clusterState, clusterState.getCollection(sourceCollection));
